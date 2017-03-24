@@ -86,3 +86,91 @@ pub fn run_once(cfg: &RunConfig) -> std::io::Result<RunOutput> {
         None => child.wait()?,
         Some(limit) => loop {
             match child.try_wait()? {
+                Some(status) => break status,
+                None => {
+                    if start.elapsed() >= limit {
+                        let _ = child.kill();
+                        timed_out = true;
+                        break child.wait()?;
+                    }
+                    thread::sleep(poll_interval(limit));
+                }
+            }
+        },
+    };
+
+    let duration_ms = start.elapsed().as_millis();
+
+    // Threads finish once the pipes close (which happens when the child exits
+    // or is killed). Join them and collect the buffers.
+    let stdout_bytes = out_rx.recv().unwrap_or_default();
+    let stderr_bytes = err_rx.recv().unwrap_or_default();
+    let _ = out_thread.join();
+    let _ = err_thread.join();
+
+    Ok(RunOutput {
+        stdout: String::from_utf8_lossy(&stdout_bytes).into_owned(),
+        stderr: String::from_utf8_lossy(&stderr_bytes).into_owned(),
+        exit_code: status.code(),
+        timed_out,
+        duration_ms,
+    })
+}
+
+/// Choose a polling interval: fine-grained for short timeouts, coarser for long
+/// ones, clamped to a sane range to avoid busy-waiting.
+fn poll_interval(limit: Duration) -> Duration {
+    let ms = (limit.as_millis() / 50).clamp(2, 25) as u64;
+    Duration::from_millis(ms)
+}
+
+/// Build the ordered env list for a run. When `shuffle` is set, the insertion
+/// order is permuted deterministically (driven by the caller's RNG) so that
+/// programs sensitive to environment ordering can be surfaced.
+pub fn ordered_env(env: &BTreeMap<String, String>, order: &[usize]) -> Vec<(String, String)> {
+    let pairs: Vec<(String, String)> = env.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+    if order.len() == pairs.len() {
+        order.iter().map(|&i| pairs[i].clone()).collect()
+    } else {
+        pairs
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn shell(cmd: &str) -> Vec<String> {
+        if cfg!(windows) {
+            vec!["cmd".into(), "/C".into(), cmd.into()]
+        } else {
+            vec!["sh".into(), "-c".into(), cmd.into()]
+        }
+    }
+
+    #[test]
+    fn captures_stdout_and_exit_code() {
+        let command = shell("echo hello");
+        let cfg = RunConfig {
+            command: &command,
+            env: &[],
+            workdir: None,
+            timeout: None,
+        };
+        let out = run_once(&cfg).unwrap();
+        assert!(out.stdout.contains("hello"));
+        assert_eq!(out.exit_code, Some(0));
+        assert!(!out.timed_out);
+    }
+
+    #[test]
+    fn captures_nonzero_exit() {
+        let command = shell("exit 3");
+        let cfg = RunConfig {
+            command: &command,
+            env: &[],
+            workdir: None,
+            timeout: None,
+        };
+        let out = run_once(&cfg).unwrap();
+        assert_eq!(out.exit_code, Some(3));
