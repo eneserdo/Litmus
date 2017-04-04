@@ -1,0 +1,81 @@
+{
+  "schema": "litmus/evidence@1",
+  "scenario": "normalized-timestamp",
+  "description": "Raw output varies by wall-clock time, but is stable after normalization.",
+  "command": [
+    "node",
+    "-e",
+    "process.stdout.write('event at ' + new Date().toISOString() + ' processed\\n')"
+  ],
+  "total_runs": 15,
+  "distinct_outcomes": 1,
+  "expectation": "deterministic",
+  "verdict": "stable",
+  "timeouts": 0,
+  "min_duration_ms": 52,
+  "max_duration_ms": 54,
+  "groups": [
+    {
+      "fingerprint": "ba9b8db45a8f6fe6",
+      "count": 15,
+      "run_indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "sample": "exit=0\ntimeout=false\n--stdout--\nevent at <ts> processed\n\n--stderr--\n"
+    }
+  ],
+  "outcomes": [
+    {
+      "run_index": 0,
+      "seed": 0,
+      "fingerprint": "ba9b8db45a8f6fe6",
+      "exit_code": 0,
+      "timed_out": false,
+      "duration_ms": 53
+    },
+    {
+      "run_index": 1,
+      "seed": 1,
+      "fingerprint": "ba9b8db45a8f6fe6",
+      "exit_code": 0,
+      "timed_out": false,
+      "duration_ms": 53
+    },
+    {
+      "run_index": 2,
+      "seed": 2,
+      "fingerprint": "ba9b8db45a8f6fe6",
+      "exit_code": 0,
+      "timed_out": false,
+      "duration_ms": 53
+    },
+    {
+      "run_index": 3,
+      "seed": 3,
+      "fingerprint": "ba9b8db45a8f6fe6",
+      "exit_code": 0,
+      "timed_out": false,
+      "duration_ms": 53
+    },
+    {
+      "run_index": 4,
+      "seed": 4,
+      "fingerprint": "ba9b8db45a8f6fe6",
+      "exit_code": 0,
+      "timed_out": false,
+      "duration_ms": 53
+    },
