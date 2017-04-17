@@ -9,3 +9,14 @@
 
 declare module "node:fs" {
   /** Read a file (or fd 0 for stdin) as text. */
+  export function readFileSync(path: string | number, encoding: "utf8"): string;
+  export function writeFileSync(path: string, data: string): void;
+}
+
+declare module "node:test" {
+  type TestFn = () => void | Promise<void>;
+  export function test(name: string, fn: TestFn): void;
+}
+
+declare module "node:assert/strict" {
+  interface Assert {
