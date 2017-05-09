@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" role="img"
+     aria-labelledby="termTitle termDesc" font-family="'Cascadia Code','JetBrains Mono',Consolas,monospace">
+  <title id="termTitle">litmus laboratory terminal: stable and diverged evidence</title>
+  <desc id="termDesc">A lab-notebook terminal printing a litmus report: a stable scenario collapsing to
+  one outcome group, and a flaky scenario fanning out into four outcome groups with frequency bars.</desc>
+
+  <defs>
+    <linearGradient id="scr" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbf3e7"/><stop offset="1" stop-color="#f6ecda"/>
+    </linearGradient>
+    <style>
+      .bar{transform-origin:left center;animation:grow 2.4s ease-out infinite}
+      @keyframes grow{0%{transform:scaleX(0)}30%{transform:scaleX(1)}100%{transform:scaleX(1)}}
+      .cursor{animation:blink 1.05s steps(2) infinite}
+      @keyframes blink{0%,50%{opacity:1}51%,100%{opacity:0}}
+      .type{animation:type 5s steps(40) infinite}
+      @keyframes type{0%{width:0}22%{width:16.5em}100%{width:16.5em}}
+      .fade{opacity:0;animation:fade 5s ease-out infinite}
+      .f2{animation-delay:.3s}.f3{animation-delay:.6s}.f4{animation-delay:.9s}
+      .f5{animation-delay:1.2s}.f6{animation-delay:1.6s}
+      @keyframes fade{0%,10%{opacity:0}25%{opacity:1}100%{opacity:1}}
+      t{font-size:13px}
+      @media (prefers-reduced-motion: reduce){
+        .bar,.cursor,.type,.fade{animation:none;opacity:1;transform:none}}
+    </style>
+  </defs>
+
+  <!-- window chrome -->
+  <rect x="8" y="8" width="744" height="424" rx="14" fill="#243049"/>
+  <rect x="8" y="8" width="744" height="34" rx="14" fill="#1c2740"/>
+  <circle cx="30" cy="25" r="6" fill="#ff7a59"/>
+  <circle cx="50" cy="25" r="6" fill="#f2c14e"/>
+  <circle cx="70" cy="25" r="6" fill="#4f74f2"/>
+  <text x="380" y="30" text-anchor="middle" fill="#c9c0b0" font-size="12">litmus: laboratory bench</text>
+
+  <!-- screen -->
+  <rect x="20" y="52" width="720" height="368" rx="8" fill="url(#scr)"/>
+
+  <!-- prompt line with a typing command -->
+  <text x="36" y="80" fill="#ff7a59" font-size="13">$</text>
+  <clipPath id="cmd"><rect x="50" y="68" class="type" height="18"/></clipPath>
+  <g clip-path="url(#cmd)">
+    <text x="52" y="80" fill="#243049" font-size="13">litmus run scenarios/normalized-timestamp.litmus</text>
+  </g>
+
+  <!-- STABLE report block -->
+  <g fill="#243049">
