@@ -23,16 +23,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Fingerprinting** with a stable FNV-1a/64 hash over the normalized
     stdout + stderr + exit status + timeout flag.
   - **Divergence analysis**: groups identical outcomes, computes a verdict
-    (`stable` / `diverged` / `expectation_violated`), and honors the scenario's
-    `expect = deterministic | flaky` assertion.
-  - Commands: `run`, `check` (CI-friendly non-zero exit on violation), `emit`
-    (JSON evidence), `explain`, `version`, `help`.
-  - Human-readable, colorized text report with proportional outcome bars and
-    compact run-index ranges.
-  - Machine-readable JSON evidence (`schema: litmus/evidence@1`) via a
-    hand-written, dependency-free JSON writer.
-- **TypeScript tooling (`litmus-report`)**, dependency-free:
-  - Strongly-typed evidence parser/validator.
-  - Self-contained HTML report renderer (inlined CSS, no external assets) and
-    a plain-text renderer.
-  - Programmatic scenario **authoring helper** that serializes typed specs to
