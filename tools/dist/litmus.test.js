@@ -24,3 +24,29 @@ const VALID = JSON.stringify({
         {
             fingerprint: "aa",
             count: 3,
+            run_indices: [0, 1, 2],
+            sample: "out a",
+        },
+        {
+            fingerprint: "bb",
+            count: 1,
+            run_indices: [3],
+            sample: "out b",
+        },
+    ],
+    outcomes: [
+        {
+            run_index: 0,
+            seed: 0,
+            fingerprint: "aa",
+            exit_code: 0,
+            timed_out: false,
+            duration_ms: 1,
+        },
+    ],
+});
+test("parseEvidence accepts a valid document", () => {
+    const ev = parseEvidence(VALID);
+    assert.equal(ev.scenario, "demo");
+    assert.equal(ev.groups.length, 2);
+    assert.equal(ev.verdict, "diverged");
