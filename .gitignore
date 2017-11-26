@@ -2,7 +2,3 @@
 /target
 **/*.rs.bk
 Cargo.lock
-
-# Node / TypeScript tooling
-tools/dist/
-tools/node_modules/
