@@ -50,3 +50,30 @@ test("parseEvidence accepts a valid document", () => {
     assert.equal(ev.scenario, "demo");
     assert.equal(ev.groups.length, 2);
     assert.equal(ev.verdict, "diverged");
+});
+test("parseEvidence rejects invalid JSON", () => {
+    assert.throws(() => parseEvidence("{not json"), EvidenceError);
+});
+test("validateEvidence rejects wrong schema", () => {
+    assert.throws(() => validateEvidence({ ...JSON.parse(VALID), schema: "other@1" }), /unexpected schema/);
+});
+test("validateEvidence rejects bad verdict", () => {
+    assert.throws(() => validateEvidence({ ...JSON.parse(VALID), verdict: "boom" }), /unknown verdict/);
+});
+test("validateEvidence rejects non-integer run_indices", () => {
+    const data = JSON.parse(VALID);
+    data.groups[0].run_indices = [0, 1.5];
+    assert.throws(() => validateEvidence(data), /run_indices/);
+});
+test("validateEvidence allows null exit_code", () => {
+    const data = JSON.parse(VALID);
+    data.outcomes[0].exit_code = null;
+    const ev = validateEvidence(data);
+    assert.equal(ev.outcomes[0].exit_code, null);
+});
+test("escapeHtml escapes dangerous characters", () => {
+    assert.equal(escapeHtml(`<script>"'&`), "&lt;script&gt;&quot;&#39;&amp;");
+});
+test("summarizeIndices collapses ranges", () => {
+    assert.equal(summarizeIndices([0, 1, 2, 3]), "0-3");
+    assert.equal(summarizeIndices([0, 2, 3, 5]), "0, 2-3, 5");
