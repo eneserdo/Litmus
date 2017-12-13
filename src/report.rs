@@ -201,3 +201,104 @@ pub fn investigate(scenario: &Scenario) -> std::io::Result<Report> {
                 .map(|c| c.to_string())
                 .unwrap_or_else(|| "none".into()),
             raw.timed_out,
+            raw.stdout,
+            raw.stderr,
+        );
+        let canonical = normalize(&combined, &scenario.normalize);
+        let fp = fingerprint(canonical.as_bytes());
+
+        outcomes.push(Outcome {
+            run_index,
+            seed,
+            fingerprint: fp,
+            exit_code: raw.exit_code,
+            timed_out: raw.timed_out,
+            duration_ms: raw.duration_ms,
+            canonical,
+        });
+    }
+
+    Ok(build_report(scenario, outcomes))
+}
+
+/// Group outcomes by fingerprint and derive the verdict. Split out for testing.
+pub fn build_report(scenario: &Scenario, outcomes: Vec<Outcome>) -> Report {
+    // Preserve first-seen order of fingerprints for stable output.
+    let mut order: Vec<String> = Vec::new();
+    let mut map: BTreeMap<String, OutcomeGroup> = BTreeMap::new();
+
+    let mut min_duration_ms = u128::MAX;
+    let mut max_duration_ms = 0u128;
+    let mut timeouts = 0u32;
+
+    for o in &outcomes {
+        min_duration_ms = min_duration_ms.min(o.duration_ms);
+        max_duration_ms = max_duration_ms.max(o.duration_ms);
+        if o.timed_out {
+            timeouts += 1;
+        }
+        let entry = map.entry(o.fingerprint.clone()).or_insert_with(|| {
+            order.push(o.fingerprint.clone());
+            OutcomeGroup {
+                fingerprint: o.fingerprint.clone(),
+                count: 0,
+                run_indices: Vec::new(),
+                sample: o.canonical.clone(),
+            }
+        });
+        entry.count += 1;
+        entry.run_indices.push(o.run_index);
+    }
+    if outcomes.is_empty() {
+        min_duration_ms = 0;
+    }
+
+    // Sort groups by descending frequency, then by fingerprint for stability.
+    let mut groups: Vec<OutcomeGroup> =
+        order.into_iter().map(|f| map.remove(&f).unwrap()).collect();
+    groups.sort_by(|a, b| {
+        b.count
+            .cmp(&a.count)
+            .then_with(|| a.fingerprint.cmp(&b.fingerprint))
+    });
+
+    let distinct = groups.len() as u32;
+    let diverged = distinct > 1;
+
+    let verdict = match scenario.expect {
+        Expectation::Deterministic => {
+            if diverged {
+                Verdict::ExpectationViolated
+            } else {
+                Verdict::Stable
+            }
+        }
+        Expectation::Flaky => {
+            if diverged {
+                Verdict::Diverged
+            } else {
+                // Expected to be flaky but stayed stable -> a violation.
+                Verdict::ExpectationViolated
+            }
+        }
+        Expectation::Unspecified => {
+            if diverged {
+                Verdict::Diverged
+            } else {
+                Verdict::Stable
+            }
+        }
+    };
+
+    Report {
+        scenario_name: scenario.name.clone(),
+        description: scenario.description.clone(),
+        command: scenario.command.clone(),
+        total_runs: outcomes.len() as u32,
+        distinct_outcomes: distinct,
+        expectation: scenario.expect,
+        verdict,
+        groups,
+        outcomes,
+        min_duration_ms,
+        max_duration_ms,
