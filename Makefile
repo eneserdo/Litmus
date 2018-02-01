@@ -16,3 +16,21 @@ fmt: ## Format Rust code.
 
 fmt-check: ## Check Rust formatting without modifying files.
 	cargo fmt --check
+
+clippy: ## Run clippy with warnings denied.
+	cargo clippy --all-targets -- -D warnings
+
+lint: fmt-check clippy ## Run all Rust lints.
+
+## TypeScript ----------------------------------------------------------------
+
+ts-build: ## Type-check and compile the TypeScript tooling.
+	cd tools && npx tsc -p tsconfig.json
+
+ts-test: ts-build ## Run the TypeScript test suite.
+	cd tools && node --test dist/litmus.test.js
+
+tools: ts-build ## Alias for ts-build.
+
+## Demos ---------------------------------------------------------------------
+
