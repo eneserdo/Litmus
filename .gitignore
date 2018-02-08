@@ -2,3 +2,12 @@
 /target
 **/*.rs.bk
 Cargo.lock
+
+# Node / TypeScript tooling
+tools/dist/
+tools/node_modules/
+node_modules/
+
+# Generated evidence / reports (the committed examples/evidence-sample.json is kept)
+*.local.json
+/report.html

@@ -4,5 +4,3 @@
  * an {@link EvidenceError} describing exactly what was wrong. No dependencies.
  */
 import { Evidence } from "./evidence.js";
-/** Parse and validate a raw JSON string into typed {@link Evidence}. */
-export declare function parseEvidence(raw: string): Evidence;
