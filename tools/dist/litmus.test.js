@@ -77,3 +77,29 @@ test("escapeHtml escapes dangerous characters", () => {
 test("summarizeIndices collapses ranges", () => {
     assert.equal(summarizeIndices([0, 1, 2, 3]), "0-3");
     assert.equal(summarizeIndices([0, 2, 3, 5]), "0, 2-3, 5");
+    assert.equal(summarizeIndices([]), "(none)");
+    assert.equal(summarizeIndices([5, 4, 3]), "3-5");
+});
+test("renderHtml produces a self-contained document", () => {
+    const html = renderHtml(parseEvidence(VALID));
+    assert.match(html, /<!DOCTYPE html>/);
+    assert.match(html, /litmus :: demo/);
+    assert.match(html, /DIVERGED/);
+    assert.match(html, /<style>/);
+    // No external asset references.
+    assert.doesNotMatch(html, /https?:\/\//);
+});
+test("renderHtml escapes scenario content", () => {
+    const data = JSON.parse(VALID);
+    data.scenario = "<evil>";
+    const html = renderHtml(validateEvidence(data));
+    assert.match(html, /&lt;evil&gt;/);
+    assert.doesNotMatch(html, /<evil>/);
+});
+test("renderText summarizes groups", () => {
+    const text = renderText(parseEvidence(VALID));
+    assert.match(text, /litmus :: demo/);
+    assert.match(text, /\[#0\] aa 3\/4/);
+});
+test("quoteToken quotes only when needed", () => {
+    assert.equal(quoteToken("echo"), "echo");
