@@ -42,3 +42,91 @@ pub fn run_once(cfg: &RunConfig) -> std::io::Result<RunOutput> {
         .command
         .split_first()
         .expect("command validated non-empty during parsing");
+
+    let mut cmd = Command::new(program);
+    cmd.args(args);
+    for (k, v) in cfg.env {
+        cmd.env(k, v);
+    }
+    if let Some(dir) = cfg.workdir {
+        cmd.current_dir(dir);
+    }
+    cmd.stdin(Stdio::null());
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+
+    let start = Instant::now();
+    let mut child = cmd.spawn()?;
+
+    // Drain stdout/stderr on separate threads so a large output cannot deadlock
+    // against a full pipe buffer while we wait.
+    let mut out_handle = child.stdout.take();
+    let mut err_handle = child.stderr.take();
+
+    let (out_tx, out_rx) = mpsc::channel();
+    let (err_tx, err_rx) = mpsc::channel();
+
+    let out_thread = thread::spawn(move || {
+        let mut buf = Vec::new();
+        if let Some(ref mut h) = out_handle {
+            let _ = h.read_to_end(&mut buf);
+        }
+        let _ = out_tx.send(buf);
+    });
+    let err_thread = thread::spawn(move || {
+        let mut buf = Vec::new();
+        if let Some(ref mut h) = err_handle {
+            let _ = h.read_to_end(&mut buf);
+        }
+        let _ = err_tx.send(buf);
+    });
+
+    let mut timed_out = false;
+    let status = match cfg.timeout {
+        None => child.wait()?,
+        Some(limit) => loop {
+            match child.try_wait()? {
+                Some(status) => break status,
+                None => {
+                    if start.elapsed() >= limit {
+                        let _ = child.kill();
+                        timed_out = true;
+                        break child.wait()?;
+                    }
+                    thread::sleep(poll_interval(limit));
+                }
+            }
+        },
+    };
+
+    let duration_ms = start.elapsed().as_millis();
+
+    // Threads finish once the pipes close (which happens when the child exits
+    // or is killed). Join them and collect the buffers.
+    let stdout_bytes = out_rx.recv().unwrap_or_default();
+    let stderr_bytes = err_rx.recv().unwrap_or_default();
+    let _ = out_thread.join();
+    let _ = err_thread.join();
+
+    Ok(RunOutput {
+        stdout: String::from_utf8_lossy(&stdout_bytes).into_owned(),
+        stderr: String::from_utf8_lossy(&stderr_bytes).into_owned(),
+        exit_code: status.code(),
+        timed_out,
+        duration_ms,
+    })
+}
+
+/// Choose a polling interval: fine-grained for short timeouts, coarser for long
+/// ones, clamped to a sane range to avoid busy-waiting.
+fn poll_interval(limit: Duration) -> Duration {
+    let ms = (limit.as_millis() / 50).clamp(2, 25) as u64;
+    Duration::from_millis(ms)
+}
+
+/// Build the ordered env list for a run. When `shuffle` is set, the insertion
+/// order is permuted deterministically (driven by the caller's RNG) so that
+/// programs sensitive to environment ordering can be surfaced.
+pub fn ordered_env(env: &BTreeMap<String, String>, order: &[usize]) -> Vec<(String, String)> {
+    let pairs: Vec<(String, String)> = env.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+    if order.len() == pairs.len() {

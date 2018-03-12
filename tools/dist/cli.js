@@ -18,3 +18,23 @@ USAGE:
   litmus-report html <evidence.json> [--out FILE]
   litmus-report text <evidence.json>
   litmus-report --help
+
+ARGS:
+  <evidence.json>   Path to a litmus evidence file, or "-" for stdin.
+
+OPTIONS:
+  --out FILE        Write output to FILE instead of stdout (html mode).
+`;
+function readInput(path) {
+    if (path === "-") {
+        return readFileSync(0, "utf8");
+    }
+    return readFileSync(path, "utf8");
+}
+export function main(argv) {
+    const args = [...argv];
+    const command = args.shift();
+    if (!command || command === "--help" || command === "-h") {
+        process.stdout.write(HELP);
+        return command ? 0 : 1;
+    }
