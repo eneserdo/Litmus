@@ -3,3 +3,15 @@ name = "litmus"
 version = "0.1.0"
 edition = "2021"
 description = "A nondeterminism / flaky-test laboratory: run a command repeatedly under controlled conditions, normalize and fingerprint outcomes, and report divergence."
+license = "MIT"
+repository = "https://github.com/example/litmus"
+readme = "README.md"
+keywords = ["testing", "flaky", "nondeterminism", "reproducibility", "cli"]
+categories = ["command-line-utilities", "development-tools::testing"]
+
+[[bin]]
+name = "litmus"
+path = "src/main.rs"
+
+[lib]
+name = "litmus"

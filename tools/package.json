@@ -1,0 +1,11 @@
+{
+  "name": "litmus-report",
+  "version": "0.1.0",
+  "description": "Dependency-free renderer and scenario authoring helper for litmus evidence.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "litmus-report": "dist/cli.js"
+  },
+  "files": [
+    "dist"

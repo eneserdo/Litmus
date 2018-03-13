@@ -20,3 +20,14 @@ declare module "node:test" {
 
 declare module "node:assert/strict" {
   interface Assert {
+    (value: unknown, message?: string): void;
+    equal(actual: unknown, expected: unknown, message?: string): void;
+    deepEqual(actual: unknown, expected: unknown, message?: string): void;
+    match(value: string, regexp: RegExp, message?: string): void;
+    doesNotMatch(value: string, regexp: RegExp, message?: string): void;
+    throws(fn: () => unknown, expected?: RegExp | (new (...args: never[]) => Error)): void;
+  }
+  const assert: Assert;
+  export default assert;
+}
+
