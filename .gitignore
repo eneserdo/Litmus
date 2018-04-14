@@ -11,3 +11,7 @@ node_modules/
 # Generated evidence / reports (the committed examples/evidence-sample.json is kept)
 *.local.json
 /report.html
+/evidence.json
+examples/report.html
+
+# Editor / OS
