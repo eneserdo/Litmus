@@ -17,3 +17,9 @@ export interface ScenarioSpec {
     description?: string;
     /** Command tokens; the first is the program, the rest are arguments. */
     command: readonly string[];
+    runs?: number;
+    timeout_ms?: number;
+    seed?: number;
+    shuffle_env?: boolean;
+    workdir?: string;
+    expect?: Expectation;
