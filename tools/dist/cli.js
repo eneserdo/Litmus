@@ -38,3 +38,44 @@ export function main(argv) {
         process.stdout.write(HELP);
         return command ? 0 : 1;
     }
+    if (command !== "html" && command !== "text") {
+        process.stderr.write(`litmus-report: unknown command ${JSON.stringify(command)}\n`);
+        return 2;
+    }
+    let out;
+    let inputPath;
+    for (let i = 0; i < args.length; i++) {
+        const a = args[i];
+        if (a === "--out") {
+            out = args[++i];
+            if (out === undefined) {
+                process.stderr.write("litmus-report: --out requires a value\n");
+                return 2;
+            }
+        }
+        else if (a.startsWith("-") && a !== "-") {
+            process.stderr.write(`litmus-report: unknown option ${JSON.stringify(a)}\n`);
+            return 2;
+        }
+        else if (inputPath === undefined) {
+            inputPath = a;
+        }
+        else {
+            process.stderr.write(`litmus-report: unexpected argument ${JSON.stringify(a)}\n`);
+            return 2;
+        }
+    }
+    if (inputPath === undefined) {
+        process.stderr.write("litmus-report: missing evidence file (use '-' for stdin)\n");
+        return 2;
+    }
+    let raw;
+    try {
+        raw = readInput(inputPath);
+    }
+    catch (err) {
+        process.stderr.write(`litmus-report: cannot read ${inputPath}: ${err.message}\n`);
+        return 1;
+    }
+    let output;
+    try {
