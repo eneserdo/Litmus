@@ -34,39 +34,3 @@ function requireArray(obj, key) {
         throw new EvidenceError(`field "${key}" must be an array`);
     }
     return v;
-}
-const VERDICTS = [
-    "stable",
-    "diverged",
-    "expectation_violated",
-];
-const EXPECTATIONS = [
-    "deterministic",
-    "flaky",
-    "unspecified",
-];
-function asVerdict(value) {
-    if (VERDICTS.includes(value)) {
-        return value;
-    }
-    throw new EvidenceError(`unknown verdict: ${JSON.stringify(value)}`);
-}
-function asExpectation(value) {
-    if (EXPECTATIONS.includes(value)) {
-        return value;
-    }
-    throw new EvidenceError(`unknown expectation: ${JSON.stringify(value)}`);
-}
-function parseGroup(value, index) {
-    if (!isObject(value)) {
-        throw new EvidenceError(`groups[${index}] must be an object`);
-    }
-    const run_indices = requireArray(value, "run_indices").map((n, i) => {
-        if (typeof n !== "number" || !Number.isInteger(n)) {
-            throw new EvidenceError(`groups[${index}].run_indices[${i}] must be an integer`);
-        }
-        return n;
-    });
-    return {
-        fingerprint: requireString(value, "fingerprint"),
-        count: requireNumber(value, "count"),
