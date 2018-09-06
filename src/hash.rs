@@ -34,39 +34,3 @@ impl Rng {
 
     /// Next raw 64-bit value.
     pub fn next_u64(&mut self) -> u64 {
-        self.state = self.state.wrapping_add(0x9e3779b97f4a7c15);
-        let mut z = self.state;
-        z = (z ^ (z >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94d049bb133111eb);
-        z ^ (z >> 31)
-    }
-
-    /// Uniform integer in `[0, bound)`. Returns 0 when `bound == 0`.
-    pub fn below(&mut self, bound: usize) -> usize {
-        if bound == 0 {
-            return 0;
-        }
-        (self.next_u64() % bound as u64) as usize
-    }
-
-    /// In-place Fisher-Yates shuffle.
-    pub fn shuffle<T>(&mut self, items: &mut [T]) {
-        let len = items.len();
-        if len <= 1 {
-            return;
-        }
-        for i in (1..len).rev() {
-            let j = self.below(i + 1);
-            items.swap(i, j);
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn fnv_is_stable() {
-        // Known FNV-1a/64 value for the empty input is the offset basis.
-        assert_eq!(fingerprint(b""), "cbf29ce484222325");
