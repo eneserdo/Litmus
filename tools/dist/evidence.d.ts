@@ -11,17 +11,3 @@ export interface OutcomeGroup {
     readonly count: number;
     readonly run_indices: readonly number[];
     readonly sample: string;
-}
-export interface Outcome {
-    readonly run_index: number;
-    readonly seed: number;
-    readonly fingerprint: string;
-    readonly exit_code: number | null;
-    readonly timed_out: boolean;
-    readonly duration_ms: number;
-}
-export interface Evidence {
-    readonly schema: string;
-    readonly scenario: string;
-    readonly description: string;
-    readonly command: readonly string[];
