@@ -21,3 +21,74 @@
       @keyframes fade{0%,10%{opacity:0}25%{opacity:1}100%{opacity:1}}
       t{font-size:13px}
       @media (prefers-reduced-motion: reduce){
+        .bar,.cursor,.type,.fade{animation:none;opacity:1;transform:none}}
+    </style>
+  </defs>
+
+  <!-- window chrome -->
+  <rect x="8" y="8" width="744" height="424" rx="14" fill="#243049"/>
+  <rect x="8" y="8" width="744" height="34" rx="14" fill="#1c2740"/>
+  <circle cx="30" cy="25" r="6" fill="#ff7a59"/>
+  <circle cx="50" cy="25" r="6" fill="#f2c14e"/>
+  <circle cx="70" cy="25" r="6" fill="#4f74f2"/>
+  <text x="380" y="30" text-anchor="middle" fill="#c9c0b0" font-size="12">litmus: laboratory bench</text>
+
+  <!-- screen -->
+  <rect x="20" y="52" width="720" height="368" rx="8" fill="url(#scr)"/>
+
+  <!-- prompt line with a typing command -->
+  <text x="36" y="80" fill="#ff7a59" font-size="13">$</text>
+  <clipPath id="cmd"><rect x="50" y="68" class="type" height="18"/></clipPath>
+  <g clip-path="url(#cmd)">
+    <text x="52" y="80" fill="#243049" font-size="13">litmus run scenarios/normalized-timestamp.litmus</text>
+  </g>
+
+  <!-- STABLE report block -->
+  <g fill="#243049">
+    <text class="fade f2" x="36" y="108" font-size="13" font-weight="700">litmus :: normalized-timestamp</text>
+    <text class="fade f2" x="36" y="126" font-size="12" fill="#6b6152">runs : 15  (1 distinct outcome)</text>
+    <text class="fade f3" x="36" y="144" font-size="12" fill="#6b6152">expectation : deterministic</text>
+    <text class="fade f3" x="36" y="164" font-size="13" font-weight="700" fill="#1f8f4e">verdict : STABLE ✓</text>
+  </g>
+  <g class="fade f4">
+    <text x="36" y="188" fill="#6b6152" font-size="12">[0] 15/15 100.0%  fp=ba9b8db45a8f6fe6</text>
+    <rect x="230" y="178" width="330" height="10" rx="5" fill="#e7d5b8"/>
+    <rect class="bar" x="230" y="178" width="330" height="10" rx="5" fill="#1f4bd8"/>
+  </g>
+
+  <line x1="36" y1="206" x2="724" y2="206" stroke="#e7d5b8" stroke-width="1"/>
+
+  <!-- prompt line 2 -->
+  <text x="36" y="230" fill="#ff7a59" font-size="13">$</text>
+  <text class="fade f4" x="52" y="230" fill="#243049" font-size="13">litmus run scenarios/flaky-random-outcome.litmus</text>
+
+  <!-- DIVERGED report block -->
+  <g fill="#243049">
+    <text class="fade f5" x="36" y="256" font-size="13" font-weight="700">litmus :: flaky-random-outcome</text>
+    <text class="fade f5" x="36" y="274" font-size="12" fill="#6b6152">runs : 12  (4 distinct outcomes)</text>
+    <text class="fade f5" x="36" y="294" font-size="13" font-weight="700" fill="#c0491f">verdict : DIVERGED</text>
+  </g>
+
+  <!-- four frequency bars -->
+  <g font-size="11" fill="#6b6152">
+    <text class="fade f6" x="36" y="318">[0] 4/12  33.3%  fp=4688c9756e89ec64</text>
+    <rect class="fade f6" x="300" y="309" width="240" height="9" rx="4" fill="#e7d5b8"/>
+    <rect class="bar fade f6" x="300" y="309" width="80"  height="9" rx="4" fill="#ff7a59"/>
+
+    <text class="fade f6" x="36" y="340">[1] 3/12  25.0%  fp=2c28612ab0da1d99</text>
+    <rect class="fade f6" x="300" y="331" width="240" height="9" rx="4" fill="#e7d5b8"/>
+    <rect class="bar fade f6" x="300" y="331" width="60"  height="9" rx="4" fill="#ff9d78"/>
+
+    <text class="fade f6" x="36" y="362">[2] 3/12  25.0%  fp=9e73afba2fac4352</text>
+    <rect class="fade f6" x="300" y="353" width="240" height="9" rx="4" fill="#e7d5b8"/>
+    <rect class="bar fade f6" x="300" y="353" width="60"  height="9" rx="4" fill="#4f74f2"/>
+
+    <text class="fade f6" x="36" y="384">[3] 2/12  16.7%  fp=fe920309f32cf24f · exit=1</text>
+    <rect class="fade f6" x="300" y="375" width="240" height="9" rx="4" fill="#e7d5b8"/>
+    <rect class="bar fade f6" x="300" y="375" width="40"  height="9" rx="4" fill="#1f4bd8"/>
+  </g>
+
+  <!-- live cursor -->
+  <text x="36" y="410" fill="#ff7a59" font-size="13">$</text>
+  <rect class="cursor" x="52" y="399" width="9" height="14" fill="#243049"/>
+</svg>
