@@ -72,3 +72,78 @@ drop_substring = pid=
 (`"`) quotes so arguments may contain spaces:
 
 ```ini
+command = "my program" --name 'John Doe' --flag
+# tokens: ["my program", "--name", "John Doe", "--flag"]
+```
+
+An unterminated quote is a parse error. If quoting is awkward, use repeated
+`arg =` lines instead:
+
+```ini
+command = my-tool
+arg = --title
+arg = a value with "both" 'quote' kinds
+```
+
+### Injected environment variables
+
+Every run receives two synthetic variables in addition to any `[env]` entries:
+
+- `LITMUS_SEED` — the derived per-run seed (`seed + run_index`).
+- `LITMUS_RUN`  — the 0-based run index.
+
+Target programs can read these to become reproducible (seed their PRNG) or to
+vary behavior for testing the harness.
+
+## `[env]` section
+
+Each `KEY = VALUE` line adds an environment variable for the child process.
+Names preserve their original case. Example:
+
+```ini
+[env]
+RUST_BACKTRACE = 1
+TZ = UTC
+```
+
+## `[normalize]` section
+
+Normalization canonicalizes output *before* fingerprinting, so that legitimate
+noise does not masquerade as divergence.
+
+| Key                | Type | Default | Effect                                                                 |
+| ------------------ | ---- | ------- | ---------------------------------------------------------------------- |
+| `strip_timestamps` | bool | `true`  | Replace ISO-8601 / `YYYY-MM-DD HH:MM:SS` / bare `HH:MM:SS` with `<ts>`.|
+| `strip_hex`        | bool | `true`  | Replace `0x…` (≥3 hex digits) and bare address-like hex runs with `<hex>`. |
+| `strip_temp_paths` | bool | `true`  | Replace `/tmp/…`, `/var/folders/…`, and Windows `…\Temp\…` with `<tmp>`. |
+| `trim_trailing_ws` | bool | `true`  | Trim trailing whitespace from each line.                               |
+| `sort_lines`       | bool | `false` | Sort lines. Removes order-dependence (e.g. unordered set iteration).   |
+| `drop_substring`   | string | —     | Drop any line containing this literal substring (repeatable).          |
+
+The exit code and timeout flag are always folded into the fingerprint, so two
+runs that differ *only* by exit status are still reported as divergent.
+
+## Verdicts
+
+After all runs, `litmus` groups outcomes by fingerprint and assigns a verdict:
+
+| `expect`        | Observed stable          | Observed divergent        |
+| --------------- | ------------------------ | ------------------------- |
+| `deterministic` | `stable`                 | `expectation_violated` ✗  |
+| `flaky`         | `expectation_violated` ✗ | `diverged`                |
+| `unspecified`   | `stable`                 | `diverged`                |
+
+`litmus check` exits non-zero (`1`) when the verdict is `expectation_violated`,
+which is what you wire into CI. `litmus run` always exits `0` unless there is a
+usage or execution error (exit `2`).
+
+## Emitting evidence
+
+`litmus emit <scenario> --out evidence.json` writes a JSON document with schema
+`litmus/evidence@1` containing the verdict, per-group fingerprints and run
+indices, and per-run metadata (exit code, timeout, duration). Feed it to the
+TypeScript renderer:
+
+```bash
+node tools/dist/cli.js html evidence.json --out report.html
+```
