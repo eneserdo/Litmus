@@ -2,3 +2,19 @@
 # occasionally exits non-zero. Even after normalization the payload differs,
 # so litmus reports divergence. We disable timestamp/hex stripping here because
 # the randomness is the *content*, not noise.
+#
+# Because randomness is real, `expect = flaky` asserts that we DO observe more
+# than one distinct outcome across the runs.
+
+name = flaky-random-outcome
+description = Randomly prints one of several results and sometimes fails.
+
+[run]
+command = node -e "const n=Math.floor(Math.random()*4); if(n===3){console.error('transient failure'); process.exit(1);} console.log('result variant '+n);"
+runs = 30
+timeout_ms = 5000
+expect = flaky
+
+[normalize]
+strip_timestamps = false
+strip_hex = false
