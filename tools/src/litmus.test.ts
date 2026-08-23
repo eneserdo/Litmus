@@ -78,3 +78,84 @@ test("validateEvidence rejects non-integer run_indices", () => {
   const data = JSON.parse(VALID);
   data.groups[0].run_indices = [0, 1.5];
   assert.throws(() => validateEvidence(data), /run_indices/);
+});
+
+test("validateEvidence allows null exit_code", () => {
+  const data = JSON.parse(VALID);
+  data.outcomes[0].exit_code = null;
+  const ev = validateEvidence(data);
+  assert.equal(ev.outcomes[0].exit_code, null);
+});
+
+test("escapeHtml escapes dangerous characters", () => {
+  assert.equal(
+    escapeHtml(`<script>"'&`),
+    "&lt;script&gt;&quot;&#39;&amp;",
+  );
+});
+
+test("summarizeIndices collapses ranges", () => {
+  assert.equal(summarizeIndices([0, 1, 2, 3]), "0-3");
+  assert.equal(summarizeIndices([0, 2, 3, 5]), "0, 2-3, 5");
+  assert.equal(summarizeIndices([]), "(none)");
+  assert.equal(summarizeIndices([5, 4, 3]), "3-5");
+});
+
+test("renderHtml produces a self-contained document", () => {
+  const html = renderHtml(parseEvidence(VALID));
+  assert.match(html, /<!DOCTYPE html>/);
+  assert.match(html, /litmus :: demo/);
+  assert.match(html, /DIVERGED/);
+  assert.match(html, /<style>/);
+  // No external asset references.
+  assert.doesNotMatch(html, /https?:\/\//);
+});
+
+test("renderHtml escapes scenario content", () => {
+  const data = JSON.parse(VALID);
+  data.scenario = "<evil>";
+  const html = renderHtml(validateEvidence(data));
+  assert.match(html, /&lt;evil&gt;/);
+  assert.doesNotMatch(html, /<evil>/);
+});
+
+test("renderText summarizes groups", () => {
+  const text = renderText(parseEvidence(VALID));
+  assert.match(text, /litmus :: demo/);
+  assert.match(text, /\[#0\] aa 3\/4/);
+});
+
+test("quoteToken quotes only when needed", () => {
+  assert.equal(quoteToken("echo"), "echo");
+  assert.equal(quoteToken("a b"), '"a b"');
+  assert.equal(quoteToken('has"dq'), "'has\"dq'");
+  assert.equal(quoteToken(""), '""');
+});
+
+test("toScenarioText round-trips through the grammar", () => {
+  const text = toScenarioText({
+    name: "gen",
+    description: "generated",
+    command: ["node", "-e", "console.log(1)"],
+    runs: 5,
+    expect: "deterministic",
+    env: { FOO: "bar" },
+    normalize: { sort_lines: true, drop_substrings: ["noise"] },
+  });
+  assert.match(text, /name = gen/);
+  assert.match(text, /\[run\]/);
+  assert.match(text, /command = node -e console\.log\(1\)/);
+  assert.match(text, /runs = 5/);
+  assert.match(text, /\[env\]\nFOO = bar/);
+  assert.match(text, /sort_lines = true/);
+  assert.match(text, /drop_substring = noise/);
+});
+
+test("toScenarioText validates input", () => {
+  assert.throws(() => toScenarioText({ name: "", command: ["x"] }), /name is required/);
+  assert.throws(() => toScenarioText({ name: "x", command: [] }), /at least one token/);
+  assert.throws(
+    () => toScenarioText({ name: "x", command: ["y"], runs: 0 }),
+    /runs must be/,
+  );
+});
