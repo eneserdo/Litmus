@@ -210,3 +210,216 @@ impl Scenario {
                     ))
                 }
             }
+        }
+
+        if command.is_empty() {
+            return Err(ParseError::new(
+                "scenario is missing a `command` in the [run] section".to_string(),
+            ));
+        }
+        if runs == 0 {
+            return Err(ParseError::new("runs must be >= 1".to_string()));
+        }
+        if name.is_empty() {
+            name = "unnamed-scenario".to_string();
+        }
+
+        Ok(Scenario {
+            name,
+            description,
+            command,
+            runs,
+            timeout_ms,
+            shuffle_env,
+            seed,
+            workdir,
+            expect,
+            env,
+            normalize,
+        })
+    }
+}
+
+/// Remove a trailing `#` or `;` comment that is not inside quotes.
+fn strip_comment(line: &str) -> &str {
+    let mut in_single = false;
+    let mut in_double = false;
+    for (i, ch) in line.char_indices() {
+        match ch {
+            '\'' if !in_double => in_single = !in_single,
+            '"' if !in_single => in_double = !in_double,
+            '#' | ';' if !in_single && !in_double => return &line[..i],
+            _ => {}
+        }
+    }
+    line
+}
+
+fn split_kv(line: &str) -> Option<(&str, &str)> {
+    let eq = line.find('=')?;
+    let key = line[..eq].trim();
+    let value = line[eq + 1..].trim();
+    if key.is_empty() {
+        return None;
+    }
+    Some((key, value))
+}
+
+fn parse_bool(value: &str, lineno: usize) -> Result<bool, ParseError> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "true" | "yes" | "1" | "on" => Ok(true),
+        "false" | "no" | "0" | "off" => Ok(false),
+        other => Err(ParseError::at(
+            lineno,
+            format!("invalid boolean: {other:?}"),
+        )),
+    }
+}
+
+/// Split a command string into tokens, honoring single and double quotes.
+fn tokenize_command(input: &str) -> Result<Vec<String>, ParseError> {
+    let mut tokens = Vec::new();
+    let mut cur = String::new();
+    let mut in_single = false;
+    let mut in_double = false;
+    let mut has_token = false;
+
+    for ch in input.chars() {
+        match ch {
+            '\'' if !in_double => {
+                in_single = !in_single;
+                has_token = true;
+            }
+            '"' if !in_single => {
+                in_double = !in_double;
+                has_token = true;
+            }
+            c if c.is_whitespace() && !in_single && !in_double => {
+                if has_token {
+                    tokens.push(std::mem::take(&mut cur));
+                    has_token = false;
+                }
+            }
+            c => {
+                cur.push(c);
+                has_token = true;
+            }
+        }
+    }
+    if in_single || in_double {
+        return Err(ParseError::new("unterminated quote in command".to_string()));
+    }
+    if has_token {
+        tokens.push(cur);
+    }
+    Ok(tokens)
+}
+
+/// Error produced while parsing a scenario file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseError {
+    pub line: Option<usize>,
+    pub message: String,
+}
+
+impl ParseError {
+    fn new(message: String) -> ParseError {
+        ParseError {
+            line: None,
+            message,
+        }
+    }
+    fn at(line: usize, message: String) -> ParseError {
+        ParseError {
+            line: Some(line),
+            message,
+        }
+    }
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.line {
+            Some(l) => write!(f, "scenario parse error (line {l}): {}", self.message),
+            None => write!(f, "scenario parse error: {}", self.message),
+        }
+    }
+}
+
+impl std::error::Error for ParseError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_minimal_scenario() {
+        let s = Scenario::parse("[run]\ncommand = echo hello").unwrap();
+        assert_eq!(s.command, vec!["echo", "hello"]);
+        assert_eq!(s.runs, 10);
+        assert_eq!(s.expect, Expectation::Unspecified);
+    }
+
+    #[test]
+    fn parses_full_scenario() {
+        let text = r#"
+            name = demo
+            description = a demo scenario
+            [run]
+            command = "my prog" --flag 'a b'
+            runs = 5
+            timeout_ms = 1500
+            shuffle_env = true
+            seed = 42
+            expect = deterministic
+            [env]
+            GREETING = hi there
+            [normalize]
+            sort_lines = true
+            drop_substring = noise
+        "#;
+        let s = Scenario::parse(text).unwrap();
+        assert_eq!(s.name, "demo");
+        assert_eq!(s.command, vec!["my prog", "--flag", "a b"]);
+        assert_eq!(s.runs, 5);
+        assert_eq!(s.timeout_ms, Some(1500));
+        assert!(s.shuffle_env);
+        assert_eq!(s.seed, 42);
+        assert_eq!(s.expect, Expectation::Deterministic);
+        assert_eq!(s.env.get("GREETING").map(String::as_str), Some("hi there"));
+        assert!(s.normalize.sort_lines);
+        assert_eq!(s.normalize.drop_substrings, vec!["noise".to_string()]);
+    }
+
+    #[test]
+    fn comments_and_blanks_ignored() {
+        let text = "# top comment\n\n[run] ; section\ncommand = echo hi ; trailing\n";
+        let s = Scenario::parse(text).unwrap();
+        assert_eq!(s.command, vec!["echo", "hi"]);
+    }
+
+    #[test]
+    fn arg_accumulation() {
+        let text = "[run]\ncommand = prog\narg = one\narg = two";
+        let s = Scenario::parse(text).unwrap();
+        assert_eq!(s.command, vec!["prog", "one", "two"]);
+    }
+
+    #[test]
+    fn missing_command_is_error() {
+        let err = Scenario::parse("name = x").unwrap_err();
+        assert!(err.message.contains("command"));
+    }
+
+    #[test]
+    fn unterminated_quote_errors() {
+        let err = Scenario::parse("[run]\ncommand = \"oops").unwrap_err();
+        assert!(err.message.contains("unterminated"));
+    }
+
+    #[test]
+    fn bad_bool_reports_line() {
+        let err = Scenario::parse("[run]\ncommand = x\nshuffle_env = maybe").unwrap_err();
+        assert_eq!(err.line, Some(3));
+    }
+}
