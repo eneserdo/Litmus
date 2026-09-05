@@ -4,3 +4,29 @@
  * generated (e.g. from a test matrix) and written out as `.litmus` files.
  */
 export type Expectation = "deterministic" | "flaky" | "unspecified";
+export interface NormalizeSpec {
+    strip_timestamps?: boolean;
+    strip_hex?: boolean;
+    strip_temp_paths?: boolean;
+    trim_trailing_ws?: boolean;
+    sort_lines?: boolean;
+    drop_substrings?: readonly string[];
+}
+export interface ScenarioSpec {
+    name: string;
+    description?: string;
+    /** Command tokens; the first is the program, the rest are arguments. */
+    command: readonly string[];
+    runs?: number;
+    timeout_ms?: number;
+    seed?: number;
+    shuffle_env?: boolean;
+    workdir?: string;
+    expect?: Expectation;
+    env?: Readonly<Record<string, string>>;
+    normalize?: NormalizeSpec;
+}
+/** Quote a command token if it contains whitespace or quote characters. */
+export declare function quoteToken(token: string): string;
+/** Serialize a {@link ScenarioSpec} into `.litmus` file text. */
+export declare function toScenarioText(spec: ScenarioSpec): string;
