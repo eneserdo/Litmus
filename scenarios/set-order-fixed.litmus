@@ -1,3 +1,19 @@
 # The FIX for `set-order-flaky.litmus`. The command still shuffles, but it now
 # prints each element on its own line and litmus normalizes with
 # `sort_lines = true`, canonicalizing order. All runs then fingerprint the same
+# and the scenario is deterministic.
+#
+# Lesson: sometimes flakiness lives in the *assertion*, not the code. Sorting
+# before comparison removes order-dependence.
+
+name = set-order-fixed
+description = Same shuffled collection, made stable by sorting during normalization.
+
+[run]
+command = node -e "const a=[1,2,3,4,5]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} console.log(a.join('\n'));"
+runs = 25
+timeout_ms = 5000
+expect = deterministic
+
+[normalize]
+sort_lines = true
