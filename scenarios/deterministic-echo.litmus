@@ -2,3 +2,19 @@
 #
 # We use `node -e` because Node is available cross-platform and lets us write
 # a self-contained snippet without an external script file. The snippet just
+# prints a fixed string, so every run fingerprints identically.
+
+name = deterministic-echo
+description = A command that prints the same thing every time.
+
+[run]
+command = node -e "process.stdout.write('hello from litmus\n')"
+runs = 12
+timeout_ms = 5000
+expect = deterministic
+
+[normalize]
+# Nothing to strip here, but we keep the defaults on to prove they are
+# idempotent for already-clean output.
+strip_timestamps = true
+strip_hex = true
