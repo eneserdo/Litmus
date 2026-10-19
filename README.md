@@ -221,3 +221,227 @@ Each run is reduced to a fingerprint over a *combined* record:
 ```text
 exit=<code|none>
 timeout=<bool>
+--stdout--
+<normalized stdout>
+--stderr--
+<normalized stderr>
+```
+
+That block is normalized, then hashed with **64-bit FNV-1a** rendered as lowercase hex
+(`fp=ba9b8db45a8f6fe6`). FNV-1a is chosen over `DefaultHasher` because its output is
+**stable across Rust versions** — essential when fingerprints are persisted into JSON and
+compared later. Folding in the exit code and timeout flag means a command that differs
+*only* by exit status is still flagged divergent. Runs sharing a fingerprint are grouped;
+groups sort by descending frequency, ties broken by fingerprint for stable output.
+
+## Verdicts: stable / diverged / expectation
+
+The verdict is a function of what you asserted (`expect`) and what was observed:
+
+| `expect` | observed **stable** (1 group) | observed **divergent** (2+ groups) |
+| --- | --- | --- |
+| `deterministic` | `stable` ✓ | `expectation_violated` ✗ |
+| `flaky` | `expectation_violated` ✗ | `diverged` ✓ |
+| `unspecified` | `stable` | `diverged` |
+
+Note the symmetry: declaring `expect = flaky` and then observing perfect stability is
+*also* a violation — useful for asserting that a known-flaky reproduction still reproduces.
+`litmus check` exits `1` on `expectation_violated`; that is the signal you wire into CI.
+
+## Evidence → HTML pipeline
+
+`litmus emit` (or `run --out FILE`) writes JSON with schema `litmus/evidence@1`:
+
+```json
+{
+  "schema": "litmus/evidence@1",
+  "scenario": "normalized-timestamp",
+  "verdict": "stable",
+  "total_runs": 15, "distinct_outcomes": 1, "timeouts": 0,
+  "min_duration_ms": 52, "max_duration_ms": 54,
+  "groups": [
+    { "fingerprint": "ba9b8db45a8f6fe6", "count": 15, "run_indices": [0], "sample": "exit=0\ntimeout=false\n--stdout--\nevent at <ts> processed\n\n--stderr--\n" }
+  ],
+  "outcomes": [
+    { "run_index": 0, "seed": 0, "fingerprint": "ba9b8db45a8f6fe6", "exit_code": 0, "timed_out": false, "duration_ms": 53 }
+  ]
+}
+```
+
+A complete sample lives at [`examples/evidence-sample.json`](examples/evidence-sample.json).
+Hand it to the dependency-free renderer to produce a self-contained HTML report or plain
+text:
+
+```bash
+node tools/dist/cli.js html evidence.json --out report.html   # inlined CSS, no external assets
+node tools/dist/cli.js text evidence.json                     # or plain text
+node tools/dist/cli.js html - < evidence.json                 # read from stdin
+```
+
+## Scenario gallery
+
+Every example uses `node -e` so it behaves identically across platforms. Each one isolates a
+single lesson:
+
+| Scenario | Demonstrates | Verdict |
+| --- | --- | --- |
+| [`deterministic-echo`](scenarios/deterministic-echo.litmus) | A genuinely stable command; defaults are idempotent on clean output. | stable |
+| [`normalized-timestamp`](scenarios/normalized-timestamp.litmus) | Raw output varies by clock, but timestamp masking makes it stable. | stable |
+| [`seeded-deterministic`](scenarios/seeded-deterministic.litmus) | A pseudo-random program pinned to a fixed internal seed. | stable |
+| [`set-order-flaky`](scenarios/set-order-flaky.litmus) | Unordered iteration → nondeterministic line order. | diverged |
+| [`set-order-fixed`](scenarios/set-order-fixed.litmus) | The fix: `sort_lines` removes order-dependence. | stable |
+| [`flaky-random-outcome`](scenarios/flaky-random-outcome.litmus) | Random payload plus an occasional non-zero exit. | diverged |
+
+The `set-order-*` pair is the most instructive: the *code* is identical between them; the
+flakiness lived in the assertion, and `sort_lines` moved comparison to a canonical form.
+
+## CI recipes
+
+Use `check` to fail a build when a scenario's expectation is violated. A minimal gate:
+
+```yaml
+# .github/workflows/flaky-gate.yml
+- run: cargo build --release
+- name: Assert stability
+  run: |
+    bin=./target/release/litmus
+    [ -f "$bin.exe" ] && bin="$bin.exe"
+    "$bin" check scenarios/deterministic-echo.litmus
+    "$bin" check scenarios/normalized-timestamp.litmus
+    "$bin" check scenarios/set-order-fixed.litmus
+```
+
+To attach evidence to a run, emit JSON and render HTML as an artifact:
+
+```yaml
+- run: ./target/release/litmus emit scenarios/flaky-random-outcome.litmus --out evidence.json
+- run: node tools/dist/cli.js html evidence.json --out report.html
+- uses: actions/upload-artifact@v4
+  with: { name: litmus-report, path: "evidence.json\nreport.html" }
+```
+
+The shipped [`.github/workflows/ci.yml`](.github/workflows/ci.yml) goes further: Rust suite
+on Linux/macOS/Windows, TypeScript on Linux, and an end-to-end job that emits and uploads a
+rendered report.
+
+## Interpretation cautions
+
+A verdict is only as trustworthy as the experiment that produced it:
+
+- **"Stable" means stable at your normalization resolution**, not "correct." Over-aggressive
+  masking can hide real divergence — read the sample output and confirm the
+  `<ts>`/`<hex>`/`<tmp>` tokens landed where you expected.
+- **Absence of divergence is not proof of determinism.** A 1-in-10,000 race needs far more
+  than `runs = 12`; raise `--runs` for rare flakes. Group frequencies estimate, not
+  guarantee, the true distribution.
+- **The harness controls what it can, not the world.** It does not sandbox network,
+  filesystem, or clock; external state can leak in and show up as divergence you must judge.
+- **Timeouts are recorded, not retried** — a timed-out run is a distinct observation
+  (`timeout=true`), not an error. **Duration is wall-clock and noisy**, so treat `min`/`max`
+  as informational, not a benchmark.
+
+## Install & build
+
+Requirements: a stable Rust toolchain (CLI) and Node.js ≥ 18 (only for the optional
+TypeScript tooling). Nothing is downloaded — both sides are dependency-free.
+
+```bash
+# Build the CLI
+cargo build --release
+# binary at target/release/litmus (litmus.exe on Windows)
+
+# Build & test the TypeScript tooling (optional)
+cd tools
+npx tsc -p tsconfig.json
+node --test dist/litmus.test.js
+```
+
+Or drive everything through the [`Makefile`](Makefile):
+
+```bash
+make all      # build + test Rust and TypeScript
+make demo     # run every example scenario
+make emit     # emit evidence and render an HTML report
+make lint     # cargo fmt --check + clippy -D warnings
+```
+
+## Command reference
+
+| Command | Purpose |
+| --- | --- |
+| `litmus run <scenario>` | Run the scenario and print a text report. |
+| `litmus check <scenario>` | Like `run`, but **exit 1** if the expectation is violated. Use in CI. |
+| `litmus emit <scenario>` | Run and write JSON evidence (`--out FILE`, or stdout). |
+| `litmus explain <scenario>` | Parse the scenario and print its resolved configuration. |
+| `litmus version` / `help` | Version / usage. |
+
+Common options: `--runs N`, `--timeout-ms N`, `--seed N`, `--json`, `--out FILE`,
+`--sample-lines N`, `--no-color` (honors `NO_COLOR`).
+
+Exit codes: `0` success · `1` expectation violated (`check` only) · `2` usage or execution
+error (unreadable scenario, or the program cannot be spawned).
+
+## Project layout
+
+```text
+litmus/
+├── Cargo.toml
+├── src/
+│   ├── main.rs        # CLI: argument parsing, subcommands
+│   ├── lib.rs         # library root + text report renderer
+│   ├── scenario.rs    # .litmus parser
+│   ├── runner.rs      # command execution with timeout
+│   ├── normalize.rs   # output canonicalization
+│   ├── hash.rs        # FNV-1a fingerprint + SplitMix64 RNG
+│   ├── json.rs        # dependency-free JSON writer
+│   └── report.rs      # orchestration + divergence analysis
+├── tests/integration.rs   # end-to-end tests against real processes
+├── scenarios/             # example .litmus files (the gallery)
+├── tools/src/             # TS: evidence types, parser, renderer, author, CLI, tests
+├── docs/SCENARIO.md       # full scenario reference
+├── docs/assets/           # README artwork (animated SVG)
+├── examples/evidence-sample.json
+├── Makefile
+└── .github/workflows/ci.yml
+```
+
+## Troubleshooting
+
+- **`scenario is missing a command in the [run] section`** — add a `command`, or accumulate
+  arguments with `arg =` lines.
+- **`unterminated quote in command`** — a `'` or `"` was opened but not closed; close it or
+  switch to repeated `arg =` lines.
+- **`scenario parse error (line N): …`** — the parser points at the line. Common causes: a
+  bad boolean (only `true/false/yes/no/1/0/on/off`) or an unknown key in a section.
+- **Everything reports `diverged` unexpectedly** — a needed normalization pass is off, or the
+  noise isn't recognized. Inspect the sample lines, then enable the matching pass or add a
+  `drop_substring`.
+- **A `deterministic` scenario flips to `expectation_violated`** — the command really
+  diverged; the group samples show how, the run indices show which repetitions.
+- **`cannot read <path>`** — wrong working directory; `litmus` reads the scenario relative to
+  where you invoke it.
+
+## Limitations
+
+- **No sandboxing.** litmus controls seeds, env, order, timeout, and workdir — not network,
+  filesystem, or clock. Interpret external divergence accordingly.
+- **Line-oriented normalization.** Masks operate per line over a fixed set of shapes
+  (ISO-ish timestamps, `0x`/bare hex, common temp roots); exotic formats need a
+  `drop_substring` or a code change.
+- **Fingerprints are equality, not similarity.** Outcomes match only if their canonical forms
+  are byte-identical; litmus does not compute a diff or a distance.
+- **Sequential runs.** Repetitions execute one after another — no built-in parallel execution.
+- **UTF-8 lossy capture.** Output is decoded with `from_utf8_lossy`; raw binary is not
+  preserved byte-for-byte.
+
+## Roadmap
+
+- Parallel run execution with a bounded worker pool.
+- A `diff` subcommand showing the minimal delta between two outcome groups.
+- More normalization passes (UUIDs, durations, PIDs) behind explicit flags.
+- A `--baseline evidence.json` mode for `check`, failing only on *new* fingerprints.
+- JUnit-style XML output alongside the HTML renderer for CI dashboards.
+
+## License
+
+MIT — see [`LICENSE`](LICENSE).
